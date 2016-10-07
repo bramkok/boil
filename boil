@@ -1,0 +1,513 @@
+#!/usr/bin/env bash
+#
+# boil
+#
+# Simple and fast scaffolding
+#
+# Usage:
+#   boil [--option <argument>]
+#
+# Options:
+#   -h --help             Display this help information.
+#   -b --boilerplate      Boilerplate to use.
+#   -n --name             Name of the project.
+#   -d --description      Description of the project.
+#   -a --author           Name of the author.
+#   -u --username         GitHub username.
+#   -p --path             Target path of the project.
+#
+# https://github.com/bramkok/boil
+
+### Configuration
+#####################################################################
+
+set -eu -o pipefail
+# shellcheck disable=SC2034
+DEFAULT_IFS="${IFS}"
+SAFER_IFS=$'\n\t'
+IFS="${SAFER_IFS}"
+
+### Global variables
+#####################################################################
+
+## General settings
+
+# Name of program
+_ME=$(basename "${0}")
+
+# GitHub URL
+_GITHUB_URL="https://github.com"
+
+# Set project path to ENV variable or to PWD
+_PROJECT_PATH="${BOIL_DEFAULT_PATH:-$PWD}"
+
+# Project placeholders
+_PLACEHOLDER_NAME="__project_name__"
+_PLACEHOLDER_DESCRIPTION="__project_description__"
+_PLACEHOLDER_AUTHOR="__project_author__"
+_PLACEHOLDER_USERNAME="__project_username__"
+_PLACEHOLDER_DATE="__project_date__"
+
+# Files with placeholder filename
+_FILES_PLACEHOLDER_FILENAME=""
+
+## Current project
+
+# Placeholder variables for current project
+__BOILERPLATE_URL=""
+__NAME=""
+__DESCRIPTION=""
+__AUTHOR=""
+__USERNAME=""
+__PATH=""
+__DATE=""
+
+### Debug/Exit/Help
+#####################################################################
+
+__DEBUG_COUNTER=0
+_debug() {
+  if [[ "${_USE_DEBUG:-"0"}" -eq 1 ]]; then
+    __DEBUG_COUNTER=$((__DEBUG_COUNTER+1))
+    printf "%s " "${__DEBUG_COUNTER}"
+    "${@}"
+    printf "――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――\n"
+  fi
+}
+
+debug() {
+  _debug echo "${@}"
+}
+
+_die() {
+  "${@}" 1>&2
+  exit 1
+}
+
+die() {
+  _die echo "${@}"
+}
+
+_print_help() {
+  cat <<HEREDOC
+
+boil
+
+Simple and fast scaffolding
+
+Usage:
+  ${_ME} [--option <argument>]
+
+Options:
+  -h --help             Display this help information.
+  -b --boilerplate      Boilerplate to use.
+  -n --name             Name of the project.
+  -d --description      Description of the project.
+  -a --author           Name of the author.
+  -u --username         GitHub username.
+  -p --path             Target path of the project.
+
+HEREDOC
+}
+
+### Options
+#####################################################################
+
+# Short options followed by a ':' require an argument
+optstring=b:n:d:p:h
+
+unset options
+while ((${#})) # While the number of arguments is greater than 0
+do
+  case ${1} in
+    -[!-]?*) # Option type: -ab
+      for ((i=1; i<${#1}; i++))
+      do
+        c=${1:i:1} # Extract 1 character from position 'i'
+        options+=("-${c}") # Add current char to options
+        # If the option requires an argument, and it's not the last char
+        # make the rest of the string its argument
+        if [[ ${optstring} = *"${c}:"* && ${1:i+1} ]]; then
+          options+=("${1:i+1}")
+          break
+        fi
+      done
+      ;;
+    --?*=*) # Option type: --foo=bar, split on first '='
+      options+=("${1%%=*}" "${1#*=}")
+      ;;
+    --) # End of options
+      options+=(--endopts)
+      shift
+      options+=("${@}")
+      break
+      ;;
+    *) # Else, nothing special
+      options+=("${1}")
+      ;;
+  esac
+  shift
+done
+
+set -- "${options[@]:-}"
+unset options
+
+# Option variables
+_PRINT_HELP=0
+_USE_DEBUG=0
+# Project boilerplate
+_OPTION_B=0
+_OPTION_B_PARAM=""
+# Project name
+_OPTION_N=0
+_OPTION_N_PARAM=""
+# Project description
+_OPTION_D=0
+_OPTION_D_PARAM=""
+# Project author
+_OPTION_A=0
+_OPTION_A_PARAM=""
+# GitHub username
+_OPTION_U=0
+_OPTION_U_PARAM=""
+# Project path
+_OPTION_P=0
+_OPTION_P_PARAM=""
+# Options array
+_ALL_OPTIONS=(B N D A U P)
+
+_require_argument() {
+  local _option="${1:-}"
+  local _argument="${2:-}"
+  if [[ -z "${_argument}" ]] || [[ "${_argument}" =~ ^- ]]; then
+    _die printf "Option requires a argument: %s\n" "${_option}"
+  fi
+}
+
+while [ ${#} -gt 0 ]
+do
+  __option="${1:-}"
+  __maybe_param="${2:-}"
+  case "${__option}" in
+    -h|--help)
+      _PRINT_HELP=1
+      ;;
+    --debug)
+      _USE_DEBUG=1
+      ;;
+    -b|--boilerplate)
+      _require_argument "${__option}" "${__maybe_param}"
+      _OPTION_B=1
+      _OPTION_B_PARAM="${__maybe_param}"
+      ;;
+    -n|--name)
+      _require_argument "${__option}" "${__maybe_param}"
+      _OPTION_N=1
+      _OPTION_N_PARAM="${__maybe_param}"
+      ;;
+    -d|--description)
+      _require_argument "${__option}" "${__maybe_param}"
+      _OPTION_D=1
+      _OPTION_D_PARAM="${__maybe_param}"
+      ;;
+    -a|--author)
+      _require_argument "${__option}" "${__maybe_param}"
+      _OPTION_A=1
+      _OPTION_A_PARAM="${__maybe_param}"
+      ;;
+    -u|--username)
+      _require_argument "${__option}" "${__maybe_param}"
+      _OPTION_U=1
+      _OPTION_U_PARAM="${__maybe_param}"
+      ;;
+    -p|--path)
+      _require_argument "${__option}" "${__maybe_param}"
+      _OPTION_P=1
+      _OPTION_P_PARAM="${__maybe_param}"
+      ;;
+    --endopts)
+      break
+      ;;
+    -*)
+      _die printf "Unexpected option: %s\n" "${__option}"
+      ;;
+  esac
+  shift
+done
+
+### Functions
+#####################################################################
+
+_check_option() {
+  local _option="_OPTION_${1:-}"
+  if [[ "${!_option}" = 1 ]]; then return 0; else return 1; fi
+}
+
+_has_no_options() {
+  local _has_option=1
+  for _option in "${_ALL_OPTIONS[@]}"
+  do
+    if _check_option "${_option}"; then _has_option=0; fi
+  done
+  if [[ "${_has_option}" = 0 ]]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+_required_options() {
+  if _has_no_options; then 
+    _print_help
+    exit 1
+  elif [[ "${_OPTION_B}" = 0 ]]; then
+    die "Option -b, --boilerplate is required."
+  elif [[ "${_OPTION_N}" = 0 ]]; then
+    die "Option -n, --name is required."
+  else
+    return 0
+  fi
+}
+
+_get_http_code() {
+  local _url="${1:-}"
+  local _code=""
+  _code="$(curl -o /dev/null --silent --head \
+    --write-out '%{http_code}\n' "${_url}")"
+  echo "${_code}"
+  return 0
+}
+
+_validate_boilerplate() {
+  local _boilerplate="${1:-}"
+  local _http_code=0
+  if ! [[ ${_boilerplate} = *"/"* ]] || [[ ${_boilerplate} = *":"* ]]; then
+    _die printf "A boilerplate GitHub url must be formatted: 'user/repo'."
+  fi
+  _http_code="$(_get_http_code "${_GITHUB_URL}/${_boilerplate}")"
+  if [[ "${_http_code}" = "200" ]]; then
+    export __BOILERPLATE_URL="${_GITHUB_URL}/${_boilerplate}"
+    return 0
+  else
+    _die printf "The boilerplate '%s' cannot be found.\n" \
+      "${_GITHUB_URL}/${_boilerplate}"
+  fi
+}
+
+_is_existent() {
+  if [[ -e "${1:-}" ]]; then return 0; else return 1; fi
+}
+
+_is_directory() {
+  if [[ -d "${1:-}" ]]; then return 0; else return 1; fi
+}
+
+_is_directory_writable() {
+  if [[ -w "${1:-}" ]]; then return 0; else return 1; fi
+}
+
+_validate_path() {
+  local _path="${1:-$_PROJECT_PATH}"
+  if ! _is_existent "${_path}"; then
+    _die printf "Target path does not exist.\n"
+  elif ! _is_directory "${_path}"; then
+    _die printf "Target project path is not a directory.\n"
+  elif ! _is_directory_writable "${_path}"; then
+    _die printf "Directory is not writable.\n"
+  else
+    export _PROJECT_PATH="${_path}"
+    return 0
+  fi
+}
+
+_validate_name() {
+  local _name="${1:-}"
+  local -a _name_arr
+  _name_arr=($(echo "${_name}" | tr " " "\n"))
+  if [[ ${#_name_arr[@]} -gt 1 ]]; then
+    _die printf "A name must not contain spaces.\n"
+  fi
+  _debug echo "${_PROJECT_PATH}/${_name}"
+  if _is_directory "${_PROJECT_PATH}/${_name}"; then
+    _die printf "Directory '%s' already exists. Enter a different name.\n" \
+      "${_name}"
+  else
+    export __NAME="${_name}"
+    export __PATH="${_PROJECT_PATH}/${_name}"
+    return 0
+  fi
+}
+
+_validate_description() {
+  local _description="${1:-}"
+  if [ "${#_description}" -gt 255 ]; then
+    die "A description must not contain more than 255 characters."
+  else
+    export __DESCRIPTION="${_description}"
+    return 0
+  fi
+}
+
+_validate_author() {
+  local _author="${1:-"$(whoami)"}"
+  if [ "${#_author}" -gt 255 ]; then
+    die "Author name can't contain more than 255 characters."
+  else
+    export __AUTHOR="${_author}"
+    return 0
+  fi
+}
+
+_validate_username() {
+  local _username="${1:-"$(whoami)"}"
+  if [ "${#_username}" -gt 255 ]; then
+    die "Username name can't contain more than 255 characters."
+  else
+    export __USERNAME="${_username}"
+    return 0
+  fi
+}
+
+_create_project_dir() {
+  local _path="${1:-}"
+  mkdir "${_path}"
+  if [[ -d "${_path}" ]]; then
+    return 0
+  else
+    _die printf "Directory '%s' could not be created.\n" "${_path}"
+  fi
+}
+
+_download_boilerplate() {
+  local _boilerplate_url="${1:-}"
+  (cd "${__PATH}" && curl -fsSL "${_boilerplate_url}"/archive/master.tar.gz \
+    | tar -xz --strip-components 2)
+  return 0
+}
+
+_set_current_year() {
+  local _year=0
+  _year=$(date +%Y)
+  export __DATE="${_year}"
+  return 0
+}
+
+_replace_placeholders() {
+  local _path="${1:-}"
+  local _name="${2:-}"
+  local _description="${3:-}"
+  local _author="${4:-}"
+  local _username="${5:-}"
+  local _date="${6:-}"
+  find "${_path}" -type f -exec sed -i "" \
+    -e 's/'"${_PLACEHOLDER_NAME}"'/'"${_name}"'/g' {} \;
+  find "${_path}" -type f -exec sed -i "" \
+    -e 's/'"${_PLACEHOLDER_DESCRIPTION}"'/'"${_description}"'/g' {} \;
+  find "${_path}" -type f -exec sed -i "" \
+    -e 's/'"${_PLACEHOLDER_AUTHOR}"'/'"${_author}"'/g' {} \;
+  find "${_path}" -type f -exec sed -i "" \
+    -e 's/'"${_PLACEHOLDER_USERNAME}"'/'"${_username}"'/g' {} \;
+  find "${_path}" -type f -exec sed -i "" \
+    -e 's/'"${_PLACEHOLDER_DATE}"'/'"${_date}"'/g' {} \;
+  return 0
+}
+
+_find_placeholder_filenames() {
+  local _path="${1:-}"
+  local _files
+  _files=$(find "${_path}" -type f -name "__project_name__*" -exec echo {} +)
+  export _FILES_PLACEHOLDER_FILENAME=${_files}
+  return 0
+}
+
+_rename_files() {
+  local _files="${1:-}"
+  local _name="${2:-}"
+  local -a _filesArr
+  _filesArr=($(echo "${_files}" | tr " " "\n"))
+  if [[ "${#_filesArr[@]}" -eq 0 ]]; then
+    return 0
+  fi
+  for _file in "${_filesArr[@]}"; do
+    local _dirname=""
+    local _basename=""
+    local _extension=""
+    _dirname=$(dirname "${_file}")
+    _basename=$(basename "${_file}")
+    _extension=$([[ "${_basename}" = *.* ]] && echo ".${_basename##*.}" || \
+      echo '')
+    mv "${_file}" "${_dirname}"/"${_name}""${_extension}"
+  done
+  return 0
+}
+
+_initialize_git_repository() {
+  local _path="${1:-}"
+  (cd "${_path}" && git init &> /dev/null)
+  (cd "${_path}" && git add . &> /dev/null)
+  (cd "${_path}" && git commit -m "Add boilerplate files" &> /dev/null)
+  return 0
+}
+
+_output_project_path() {
+  local _path="${1:-}"
+  printf "%s\n" "${_path}"
+  return 0
+}
+
+### Runtime
+#####################################################################
+
+_main() {
+  if ((_PRINT_HELP)); then
+    _print_help
+  else
+    # Validate input on required options
+    _required_options
+
+    # Check validity of boilerplate
+    _validate_boilerplate "${_OPTION_B_PARAM:-}"
+
+    # Validate project target path
+    _validate_path "${_OPTION_P_PARAM:-}"
+
+    # Verify project name
+    _validate_name "${_OPTION_N_PARAM:-}"
+
+    # Verify project description
+    _validate_description "${_OPTION_D_PARAM:-}"
+
+    # Verify author name
+    _validate_author "${_OPTION_A_PARAM:-}"
+
+    # Verify GitHub username
+    _validate_username "${_OPTION_U_PARAM:-}"
+
+    # Create project directory
+    _create_project_dir "${__PATH:-}"
+
+    # Download and extract boilerplate to directory
+    _download_boilerplate "${__BOILERPLATE_URL:-}"
+
+    # Set date
+    _set_current_year
+
+    # Replace project name and description placeholders
+    _replace_placeholders "${__PATH:-}" "${__NAME:-}" "${__DESCRIPTION:-}" \
+      "${__AUTHOR:-}" "${__USERNAME:-}" "${__DATE:-}"
+
+    # Find files with placeholder filenames
+    _find_placeholder_filenames "${__PATH:-}"
+
+    # Rename files
+    _rename_files "${_FILES_PLACEHOLDER_FILENAME:-}" "${__NAME:-}"
+
+    # Initialize a new git repository and commit initial files
+    _initialize_git_repository "${__PATH:-}"
+
+    # Output path of created project
+    _output_project_path "${__PATH:-}"
+  fi
+}
+
+_main "${@:-}" # Call `_main` after everything has been defined
