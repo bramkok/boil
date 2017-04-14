@@ -2,17 +2,18 @@
 
 setup() {
   export _COMMAND="${BATS_TEST_DIRNAME}/../boil"
-  export TMP="${BATS_TEST_DIRNAME}/tmp"
-  export BOIL_DEFAULT_PATH="${BATS_TEST_DIRNAME}/tmp"
+  export BOIL_TMP="${BATS_TMPDIR}/boil-test"
+  export BOIL_DEFAULT_PATH="${BOIL_TMP}"
+  [ -d "$BOIL_TMP" ] && rm -rf "$BOIL_TMP"
+  [ ! -d "$BOIL_TMP" ] && mkdir -p "$BOIL_TMP"
 }
 
 teardown() {
-  [ -d "$TMP" ] && rm -rf "$TMP"/bats-*
+  [ -d "$BOIL_TMP" ] && rm -rf "$BOIL_TMP"
 }
 
 createDuplicateDirs() {
-  [ -d "$TMP" ] && mkdir -p "$TMP"/bats-test-x
-  [ -d "$TMP" ] && mkdir -p "$TMP"/bats-test-y
+  [ -d "$BOIL_TMP" ] && mkdir -p "$BOIL_TMP"/bats-test-{x,y}
 }
 
 ### General
