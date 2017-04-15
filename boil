@@ -399,16 +399,21 @@ _replace_placeholders() {
   local _author="${4:-}"
   local _username="${5:-}"
   local _date="${6:-}"
-  find "${_path}" -type f -exec sed -i "" \
+  find "${_path}" -type f -exec sed -i".bak" \
     -e 's/'"${_PLACEHOLDER_NAME}"'/'"${_name}"'/g' {} \;
-  find "${_path}" -type f -exec sed -i "" \
+	find . -type f -name '*.bak*' -exec rm {} \;
+  find "${_path}" -type f -exec sed -i".bak" \
     -e 's/'"${_PLACEHOLDER_DESCRIPTION}"'/'"${_description}"'/g' {} \;
-  find "${_path}" -type f -exec sed -i "" \
+	find . -type f -name '*.bak*' -exec rm {} \;
+  find "${_path}" -type f -exec sed -i".bak" \
     -e 's/'"${_PLACEHOLDER_AUTHOR}"'/'"${_author}"'/g' {} \;
-  find "${_path}" -type f -exec sed -i "" \
+	find . -type f -name '*.bak*' -exec rm {} \;
+  find "${_path}" -type f -exec sed -i".bak" \
     -e 's/'"${_PLACEHOLDER_USERNAME}"'/'"${_username}"'/g' {} \;
-  find "${_path}" -type f -exec sed -i "" \
+	find . -type f -name '*.bak*' -exec rm {} \;
+  find "${_path}" -type f -exec sed -i".bak" \
     -e 's/'"${_PLACEHOLDER_DATE}"'/'"${_date}"'/g' {} \;
+	find . -type f -name '*.bak*' -exec rm {} \;
   return 0
 }
 
