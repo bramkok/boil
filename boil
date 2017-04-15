@@ -2,7 +2,7 @@
 #
 # boil
 #
-# Simple and fast scaffolding
+# Simple scaffolding
 #
 # Usage:
 #   boil [--option <argument>]
@@ -93,7 +93,7 @@ _print_help() {
 
 boil
 
-Simple and fast scaffolding
+Simple scaffolding
 
 Usage:
   ${_ME} [--option <argument>]

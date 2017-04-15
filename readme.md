@@ -1,6 +1,6 @@
 # boil
 
-> Simple and fast scaffolding
+> Simple scaffolding
 
 ## Usage:
 
@@ -21,7 +21,7 @@ Choose a boilerplate hosted on GitHub. Input format:
 `--boilerplate username/repository`
 
 * Bash [`bramkok/boilerplate-bash`](https://github.com/bramkok/boilerplate-bash)
-* ES2015 [`bramkok/boilerplate-es6`](https://github.com/bramkok/boilerplate-es6)
+* ECMAScript 2015 [`bramkok/boilerplate-es2015`](https://github.com/bramkok/boilerplate-es2015)
 
 ##### `-n`, `--name` **[REQUIRED]**
 
