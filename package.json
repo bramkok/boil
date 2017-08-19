@@ -1,0 +1,8 @@
+{
+  "name": "boil",
+  "description": "Simple scaffolding",
+  "scripts": [
+    "boil"
+  ],
+  "install": "make install"
+}
